@@ -1,0 +1,17 @@
+{
+  "name": "g0v-social-ops",
+  "version": "0.0.1",
+  "description": "a slack bot for publishing content on mastodon",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["mastodon"],
+  "author": "Poga Po<poga.po@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@slack/client": "^3.9.0",
+    "node-schedule": "^1.2.3",
+    "toiletdb": "^1.4.0"
+  }
+}
