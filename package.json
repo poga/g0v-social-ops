@@ -6,12 +6,15 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["mastodon"],
+  "keywords": [
+    "mastodon"
+  ],
   "author": "Poga Po<poga.po@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "@slack/client": "^3.9.0",
     "node-schedule": "^1.2.3",
+    "superagent": "^3.5.2",
     "toiletdb": "^1.4.0"
   }
 }

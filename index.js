@@ -1,6 +1,17 @@
 const {RtmClient, CLIENT_EVENTS, RTM_EVENTS} = require('@slack/client')
 const toilet = require('toiletdb')
-var db = toilet('./data.json')
+const path = require('path')
+const request = require('superagent')
+
+var db = toilet(path.join(process.cwd(), 'data.json'))
+
+const BOT_TOKEN = process.env.SLACK_BOT_TOKEN
+const MASTODON_TOKEN = process.env.MASTODON_TOKEN
+const HOST = process.env.MASTODON_HOST
+
+if (!BOT_TOKEN) throw new Error('slack token required')
+if (!MASTODON_TOKEN) throw new Error('mastodon token required')
+if (!HOST) throw new Error('mastodon host required')
 
 db.open(function (err) {
   if (err) throw err
@@ -11,8 +22,6 @@ db.open(function (err) {
 var rtm
 
 function run () {
-  const BOT_TOKEN = process.env.SLACK_BOT_TOKEN || ''
-
   rtm = new RtmClient(BOT_TOKEN)
 
   rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function (data) {
@@ -36,16 +45,23 @@ function handler (message) {
   switch (cmd.command) {
     case 'post-new':
       newPost(db, cmd.url, function (err, post) {
-        if (err) console.log('write failed', err)
+        if (err) replyError(message.channel, err)
 
-        rtm.sendMessage(`post added: ${JSON.stringify(post)}`, message.channel)
+        replyStatus(message.channel, `post added ${JSON.stringify(post)}`)
       })
       break
     case 'post-update':
       updatePost(db, cmd.id, cmd.text, function (err, newPost) {
-        if (err) console.log('write failed', err)
+        if (err) replyError(message.channel, err)
 
-        rtm.sendMessage(`post updated: ${JSON.stringify(newPost)}`, message.channel)
+        replyStatus(message.channel, `post updated ${JSON.stringify(newPost)}`)
+      })
+      break
+    case 'post-publish':
+      publish(db, cmd.id, function (err, published) {
+        if (err) replyError(message.channel, err)
+
+        replyStatus(message.channel, `post published ${JSON.stringify(published)}`)
       })
       break
   }
@@ -67,7 +83,14 @@ function parse (text) {
     return {
       command: 'post-update',
       id: argv[2],
-      text: argv[3]
+      text: argv.slice(3).join(' ')
+    }
+  }
+
+  if (argv[1] === 'publish') {
+    return {
+      command: 'post-publish',
+      id: argv[2]
     }
   }
 }
@@ -102,4 +125,58 @@ function updatePost (db, id, text, cb) {
       cb(null, newPost)
     })
   })
+}
+
+function publish (db, id, cb) {
+  db.read('posts', function (err, data) {
+    if (err) return cb(err)
+    var toPublish = data.find(x => x.id === +id)
+    if (!toPublish) return cb(new Error(`can't find post with id ${id}`))
+
+    _publish(db, toPublish)
+  })
+
+  function _publish (db, post) {
+    request
+      .post(`${HOST}/api/v1/statuses`)
+      .query({access_token: MASTODON_TOKEN})
+      .type('form')
+      .send({status: [post.text, post.url].join('\n\n')})
+      .end(function (err, res) {
+        if (err) return cb(err)
+        archive(post)
+      })
+  }
+
+  function archive (post) {
+    db.read('posts', function (err, data) {
+      if (err) return cb(err)
+      var postIndex = data.findIndex(x => x.id === post.id)
+      db.read('archived', function (err, archived) {
+        if (err) return cb(err)
+        if (!archived) archived = []
+        var toArchive = data[postIndex]
+        archived.push(toArchive)
+        data.splice(postIndex, 1)
+
+        db.write('archived', archived, function (err) {
+          if (err) return cb(err)
+
+          db.write('posts', data, function (err) {
+            if (err) return cb(err)
+
+            cb(null, toArchive)
+          })
+        })
+      })
+    })
+  }
+}
+
+function replyStatus (channel, msg) {
+  rtm.sendMessage(`[STATUS] ${msg}`, channel)
+}
+
+function replyError (channel, err) {
+  rtm.sendMessage(`[ERROR] ${err.message}`, channel)
 }
