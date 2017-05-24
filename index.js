@@ -9,6 +9,8 @@ const BOT_TOKEN = process.env.SLACK_BOT_TOKEN
 const MASTODON_TOKEN = process.env.MASTODON_TOKEN
 const HOST = process.env.MASTODON_HOST
 
+var rtm
+
 if (!BOT_TOKEN) throw new Error('slack token required')
 if (!MASTODON_TOKEN) throw new Error('mastodon token required')
 if (!HOST) throw new Error('mastodon host required')
@@ -18,8 +20,6 @@ db.open(function (err) {
 
   run()
 })
-
-var rtm
 
 function run () {
   rtm = new RtmClient(BOT_TOKEN)
@@ -132,6 +132,7 @@ function publish (db, id, cb) {
     if (err) return cb(err)
     var toPublish = data.find(x => x.id === +id)
     if (!toPublish) return cb(new Error(`can't find post with id ${id}`))
+    if (!isReadyForPublish(toPublish)) return cb(new Error(`Post is not ready for publishing`))
 
     _publish(db, toPublish)
   })
@@ -179,4 +180,8 @@ function replyStatus (channel, msg) {
 
 function replyError (channel, err) {
   rtm.sendMessage(`[ERROR] ${err.message}`, channel)
+}
+
+function isReadyForPublish (post) {
+  return !!post.text
 }
