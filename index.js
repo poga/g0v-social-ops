@@ -105,7 +105,9 @@ function parse (text) {
     return {
       command: 'post-update',
       id: argv[2],
-      text: argv.slice(3).join(' ')
+      text: argv.slice(3).join(' ').replace(/<(.+)|(.+)>/, function (match) {
+        return match[1]
+      })
     }
   }
 
@@ -135,10 +137,8 @@ function newPost (db, url, cb) {
 function updatePost (db, id, text, cb) {
   db.read('posts', function (err, data) {
     if (err) return cb(err)
-    console.log(data)
     var postIndex = data.findIndex(x => x.id === +id)
     var newPost = Object.assign({}, data[postIndex], {text: text})
-    console.log('new post', postIndex, newPost)
     data[postIndex] = newPost
 
     db.write('posts', data, function (err) {
