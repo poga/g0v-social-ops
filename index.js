@@ -105,8 +105,8 @@ function parse (text) {
     return {
       command: 'post-update',
       id: argv[2],
-      text: argv.slice(3).join(' ').replace(/<(.+)|(.+)>/, function (match) {
-        return match[1]
+      text: argv.slice(3).join(' ').replace(/<(.+)\|(.+)>/, function (match, link) {
+        return link
       })
     }
   }
