@@ -2,6 +2,7 @@ const {RtmClient, CLIENT_EVENTS, RTM_EVENTS} = require('@slack/client')
 const toilet = require('toiletdb')
 const path = require('path')
 const request = require('superagent')
+const schedule = require('node-schedule')
 
 var db = toilet(path.join(process.cwd(), 'data.json'))
 
@@ -19,7 +20,28 @@ db.open(function (err) {
   if (err) throw err
 
   run()
+
+  startTimer(db)
 })
+
+function startTimer (db) {
+  return schedule.scheduleJob('* */4 * * *', function () {
+    console.log('looking for scheduled post')
+    db.read('posts', function (err, data) {
+      if (err) return console.error(err)
+      if (!data) return
+
+      data.forEach(post => {
+        if (isReadyForPublish(post)) {
+          publish(db, post.id, function (err, published) {
+            if (err) return console.error(err)
+            console.log('schedule published:', published)
+          })
+        }
+      })
+    })
+  })
+}
 
 function run () {
   rtm = new RtmClient(BOT_TOKEN)
